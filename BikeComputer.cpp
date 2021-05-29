@@ -22,8 +22,10 @@
 #include <ctype.h>
 #include <pcf2119r.h>
 #include <MicroNMEA.h>
+#include "FileManager.h"
 
 #define ICP1	8	// Input capture 1 is on pin 8/PB0
+#define BTN1	2	// Pushbutton on pin 2/
 
 #define LED1	13	// On-board LED on pin 13
 
@@ -34,15 +36,25 @@ pcf2119r lcd;
 static void display_time(char *b);
 static void display_degrees(uint8_t col, char dir, long angle);
 
-void LcdStatus(char *str, int status)
+void LcdStatus(uint8_t where, int status)
 {
 	if ( status != 0 )
 	{
-		Serial.print(str);
+		Serial.print("Lcd status in ");
+		Serial.print(where);
 		Serial.print(" status = ");
 		Serial.println(status);
 
 		hd44780::fatalError(status);
+	}
+}
+
+void FmStatus(uint8_t err)
+{
+	if ( err != 0 )
+	{
+		Serial.print("Fm status = ");
+		Serial.println(err);
 	}
 }
 
@@ -51,6 +63,14 @@ void setup(void)
 	char buf[16];
 	uint8_t cnt;
 	uint8_t mode_change;
+	uint8_t logging = 0;
+	unsigned long now = millis();
+	unsigned long then = now;
+	uint16_t elapsed;
+	uint8_t button_time = 0;
+	uint8_t button_state = HIGH;
+	
+	pinMode(BTN1, INPUT_PULLUP);
 	pinMode(LED1, OUTPUT);
     digitalWrite(LED1, LOW);
 
@@ -58,40 +78,111 @@ void setup(void)
 	Serial.println("Hello, World!");
 
 	int status = lcd.begin(16, 2);
-	LcdStatus("begin()", status);
+	LcdStatus(40,  status);
 
 	status = lcd.command(0x35);		// Switch to extended command mode
-	LcdStatus("command(0x35)", status);
+	LcdStatus(41, status);
 
 	status = lcd.command(0x80+31);	// Set Va = 4.3v
-	LcdStatus("SetVa", status);
+	LcdStatus(42, status);
 
 	lcd.command(0xc0+31);	// Set Vb = 4.3v
-	LcdStatus("SetVb", status);
+	LcdStatus(43, status);
 
 	status = lcd.command(0x34);		// Switch to normal command mode
-	LcdStatus("command(0x34)", status);
+	LcdStatus(44, status);
 
 	status = lcd.clear();
-	LcdStatus("clear()", status);
+	LcdStatus(45, status);
 
 	status = lcd.display();
-	LcdStatus("display()", status);
+	LcdStatus(46, status);
 
 	lcd.clear_row(0);
 	lcd.clear_row(1);
 	lcd.setCursor(0,0);
-	lcd.write("Hello, World!");
-	mode_change = 1;
+	lcd.write("Hello, World!");							// ToDo: put in flash
 
+	status = fm_init();
+	FmStatus(status);
+	if ( status == 0 )
+	{
+		Serial.println("fm_init() ok ");
+
+		status = fm_open();
+		FmStatus(status);
+		if ( status == 0 )
+		{
+			Serial.println("fm_open() ok ");
+			logging = 1;
+		}
+	}
+
+	mode_change = 1;
 	cnt = 0xff;
+
+	lcd.setCursor(15,1);
+	if ( logging )
+	{
+		lcd.write('+');
+	}
+	else
+	{
+		lcd.write('-');
+	}
 
 	for (;;)
 	{
+		now = millis();
+		elapsed = now - then;
+		then = now;
+		if ( button_time == 0 )
+		{
+			if ( digitalRead(BTN1) == button_state )
+			{	// No change
+			}
+			else
+			{	// Change of state
+				button_time = 50;		// Debounce
+				if ( button_state == HIGH )
+				{	// Was high, now low ==> pressed
+					button_state = LOW;
+					lcd.setCursor(15,1);
+					if ( logging )
+					{
+						logging = 0;
+						fm_close();
+						lcd.write('-');
+					}
+					else
+					{
+						status = fm_open();
+						FmStatus(status);
+						if ( status == 0 )
+						{
+							logging = 1;
+							lcd.write('+');
+						}
+					}
+				}
+				else
+				{	// Was high, now low ==> released
+					button_state = HIGH;
+				}
+			}
+		}
+		else
+		if ( button_time > elapsed )
+		{
+			button_time -= elapsed;
+		}
+		else
+		{
+			button_time = 0;
+		}
 		int ch = Serial.read();
 		if ( ch >= 0 )
 		{
-//			Serial.write((char)ch);
 			if ( ch == '$' )
 			{
 				cnt = 0;
@@ -102,7 +193,7 @@ void setup(void)
 				cnt++;
 				if ( cnt == 15 )
 				{
-					if ( strncmp(buf, "GPRMC,", 6) == 0 )
+					if ( strncmp(buf, "GPRMC,", 6) == 0 )	// ToDo: put in flash
 					{
 						display_time(&buf[6]);
 					}
@@ -140,6 +231,9 @@ void setup(void)
 						display_degrees(8, 'E', p);
 					}
 				}
+				const char *s = nmea.getSentence();
+				fm_write(s);
+				//Serial.println(s);
 		    }
 		}
 	}
@@ -171,7 +265,7 @@ static void display_degrees(uint8_t col, char dir, long angle)
 {
 	lcd.setCursor(col,0);
 	lcd.write(dir);
-	angle = angle/1000L;
+	angle = (angle+500L)/1000L;				// Round to nearest. Do this as integer to avoid loss of accuracy
 	double deg = ((double)angle/1000.0);
 	lcd.print(deg, 3);
 	lcd.write(' ');
