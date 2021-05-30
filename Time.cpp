@@ -1,6 +1,6 @@
-/*	FileManager.h - management of files on the BikeComputer SD card
+/* Time.cpp - timing functionality
  *
- *	(c) David Haworth
+ * (c) David Haworth
  *
  *	This file is part of BikeComputer.
  *
@@ -17,14 +17,24 @@
  *	You should have received a copy of the GNU General Public License
  *	along with BikeComputer.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef FILEMANAGER_H
-#define FILEMANAGER_H	1
 
-extern uint8_t fm_init(void);
-extern uint8_t fm_open(void);
-extern uint8_t fm_close(void);
-extern uint8_t fm_write(const char *line);
+#include <Arduino.h>
+#include "BikeComputer.h"
 
-extern void blip(char c);
+unsigned long then;
 
-#endif
+// Initialise the base time
+void tm_init(void)
+{
+	then = millis();
+}
+
+// How much time has elapsed since last time? Should only measure short intervals, so max out at 255/
+uint8_t tm_elapsed(void)
+{
+	unsigned long now = millis();
+	unsigned long elapsed = now - then;
+	if ( elapsed > 255 )
+		return 255;
+	return (uint8_t)elapsed;
+}

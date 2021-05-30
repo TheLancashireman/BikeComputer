@@ -22,12 +22,7 @@
 #include <ctype.h>
 #include <pcf2119r.h>
 #include <MicroNMEA.h>
-#include "FileManager.h"
-
-#define ICP1	8	// Input capture 1 is on pin 8/PB0
-#define BTN1	2	// Pushbutton on pin 2/
-
-#define LED1	13	// On-board LED on pin 13
+#include "BikeComputer.h"
 
 char nmeabuf[85];
 MicroNMEA nmea(nmeabuf, sizeof(nmeabuf));
@@ -48,49 +43,31 @@ void blip(char c)
 		Serial.write('\r');
 		Serial.write('\n');
 	}
-	lcd.setCursor(10,1);
+	lcd.setCursor(14,1);
 	lcd.write(c);
-}
-
-void LcdStatus(uint8_t where, int status)
-{
-#if 0
-	if ( status != 0 )
-	{
-		Serial.print("Lcd status in ");
-		Serial.print(where);
-		Serial.print(" status = ");
-		Serial.println(status);
-
-		hd44780::fatalError(status);
-	}
-#endif
 }
 
 void FmStatus(uint8_t err)
 {
+	lcd.setCursor(11,1);
 	if ( err != 0 )
 	{
-#if 0
-		Serial.print("Fm status = ");
-		Serial.println(err);
-#endif
-		lcd.setCursor(12,1);
 		lcd.print(err);
+	}
+	else
+	{
+		lcd.write(' ');
+		lcd.write(' ');
+		lcd.write(' ');
 	}
 }
 
 void setup(void)
 {
 	char buf[16];
-	uint8_t cnt;
-	uint8_t mode_change;
+	uint8_t mode_change = 1;
 	uint8_t logging = 0;
-	unsigned long now = millis();
-	unsigned long then = now;
-	uint16_t elapsed;
-	uint8_t button_time = 0;
-	uint8_t button_state = HIGH;
+	uint8_t char_cnt = 0xff;
 	
 	pinMode(BTN1, INPUT_PULLUP);
 	pinMode(LED1, OUTPUT);
@@ -99,29 +76,17 @@ void setup(void)
 	Serial.begin(9600);
 
 	int status = lcd.begin(16, 2);
-	LcdStatus(40,  status);
-
 	status = lcd.command(0x35);		// Switch to extended command mode
-	LcdStatus(41, status);
-
 	status = lcd.command(0x80+31);	// Set Va = 4.3v
-	LcdStatus(42, status);
-
 	lcd.command(0xc0+31);			// Set Vb = 4.3v
-	LcdStatus(43, status);
-
 	status = lcd.command(0x34);		// Switch to normal command mode
-	LcdStatus(44, status);
-
 	status = lcd.display();			// Turn on display
-	LcdStatus(46, status);
-
-	lcd.clear_row(0);
+	lcd.clear_row(0);				// Clear display. clear() doesn't work in this hardware
 	lcd.clear_row(1);
-	lcd.setCursor(0,0);
-	lcd.write("Hello, World!");							// ToDo: put in flash
+	lcd.setCursor(0,0);				// Boring welcome message
+	lcd.print(F("Bike Computer!"));
 
-	status = fm_init();
+	status = fm_init();				// Initialise SD card interface
 	FmStatus(status);
 	if ( status == 0 )
 	{
@@ -133,86 +98,62 @@ void setup(void)
 		}
 	}
 
-	mode_change = 1;
-	cnt = 0xff;
+	tm_init();
+	btn_init();
 
 	lcd.setCursor(15,1);
-	if ( logging )
-	{
-		lcd.write('+');
-	}
-	else
-	{
-		lcd.write('-');
-	}
+	lcd.write(logging ? '+' : '-');
 
 	for (;;)
 	{
-		now = millis();
-		elapsed = now - then;
-		then = now;
-		if ( button_time == 0 )
+		uint8_t elapsed = tm_elapsed();
+		uint8_t btn = btn_read(elapsed);
+
+		if ( btn == 1 )
 		{
-			if ( digitalRead(BTN1) == button_state )
-			{	// No change
+			if ( logging )
+			{
+				logging = 0;
+				fm_close();
+				lcd.setCursor(15,1);
+				lcd.write('-');
 			}
 			else
-			{	// Change of state
-				button_time = 50;		// Debounce
-				if ( button_state == HIGH )
-				{	// Was high, now low ==> pressed
-					button_state = LOW;
+			{
+				status = fm_open();
+				FmStatus(status);
+				if ( status == 0 )
+				{
+					logging = 1;
 					lcd.setCursor(15,1);
-					if ( logging )
-					{
-						logging = 0;
-						fm_close();
-						lcd.write('-');
-					}
-					else
-					{
-						status = fm_open();
-						FmStatus(status);
-						if ( status == 0 )
-						{
-							logging = 1;
-							lcd.write('+');
-						}
-					}
-				}
-				else
-				{	// Was high, now low ==> released
-					button_state = HIGH;
+					lcd.write('+');
 				}
 			}
 		}
-		else
-		if ( button_time > elapsed )
-		{
-			button_time -= elapsed;
-		}
-		else
-		{
-			button_time = 0;
-		}
+
 		int ch = Serial.read();
 		if ( ch >= 0 )
 		{
 			if ( ch == '$' )
 			{
-				cnt = 0;
+				char_cnt = 0;
 			}
-			else if ( cnt < 15 )	// Looking for GPRMC,hhmmss.pp
+			else if ( char_cnt < 15 )	// Looking for GPRMC,hhmmss.pp
 			{
-				buf[cnt] = ch;
-				cnt++;
-				if ( cnt == 15 )
+				buf[char_cnt] = ch;
+				char_cnt++;
+				if ( char_cnt == 15 )
 				{
-					if ( strncmp(buf, "GPRMC,", 6) == 0 )	// ToDo: put in flash
+					if ( buf[0] == 'G' && 	// Unrolled strncmp() ;-)
+						 buf[1] == 'P' && 
+						 buf[2] == 'R' && 
+						 buf[3] == 'M' && 
+						 buf[4] == 'C' && 
+						 buf[5] == ',')
 					{
 						display_time(&buf[6]);
 					}
-					cnt = 0xff;		// Wait for next sentence
+					char_cnt = 0xff;		// Wait for next sentence
 				}
 			}
 

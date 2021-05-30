@@ -22,7 +22,7 @@
 #include <SPI.h>
 #include "SdFat.h"
 #include "sdios.h"
-#include "FileManager.h"
+#include "BikeComputer.h"
 
 /* See SdFat/examples/QuickStart/QuickStart.ino for full descriptions. This is a cut-down version
 */
