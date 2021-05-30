@@ -111,7 +111,7 @@ uint8_t fm_open(void)
 			return 105;		// Unlikely; SD card contains at least 10000 files.
 	}
 
-	if ( !file.open(fn, O_WRONLY | O_CREAT | O_AT_END) )
+	if ( !file.open(fn, O_WRONLY | O_CREAT | O_TRUNC) )
 	{
 		return 106;
 	}
@@ -129,12 +129,15 @@ uint8_t fm_write(const char *line)
 		blip('0');
 		return 255;
 	}
+#if 0
 	if ( file.write('\n') <= 0 )
 	{
 		blip('?');
 		return 254;
 	}
-	byte_count += s + 1;
+	byte_count += 1;
+#endif
+	byte_count += s;
 	if ( byte_count >= 1024 )
 	{
 		file.sync();

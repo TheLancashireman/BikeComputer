@@ -21,11 +21,16 @@
 #include <Arduino.h>
 #include <ctype.h>
 #include <pcf2119r.h>
+#if 0
 #include <MicroNMEA.h>
+#endif
 #include "BikeComputer.h"
 
 char nmeabuf[85];
+#if 0
 MicroNMEA nmea(nmeabuf, sizeof(nmeabuf));
+#endif
+
 pcf2119r lcd;
 
 static void display_time(char *b);
@@ -64,12 +69,11 @@ void FmStatus(uint8_t err)
 
 void setup(void)
 {
-	char buf[16];
 	uint8_t mode_change = 1;
 	uint8_t logging = 0;
 	uint8_t char_cnt = 0xff;
+	uint8_t gp_type = GP_NONE;
 	
-	pinMode(BTN1, INPUT_PULLUP);
 	pinMode(LED1, OUTPUT);
     digitalWrite(LED1, LOW);
 
@@ -90,6 +94,7 @@ void setup(void)
 	FmStatus(status);
 	if ( status == 0 )
 	{
+		delay(1000);
 		status = fm_open();
 		FmStatus(status);
 		if ( status == 0 )
@@ -111,6 +116,7 @@ void setup(void)
 
 		if ( btn == 1 )
 		{
+			blip('1');
 			if ( logging )
 			{
 				logging = 0;
@@ -136,27 +142,60 @@ void setup(void)
 		{
 			if ( ch == '$' )
 			{
-				char_cnt = 0;
+				nmeabuf[0] = '$';
+				char_cnt = 1;
+				gp_type = GP_NONE;
 			}
-			else if ( char_cnt < 15 )	// Looking for GPRMC,hhmmss.pp
+			else
+			if ( ch == '\0' || ch == '\r' || ch == '\n' )
 			{
-				buf[char_cnt] = ch;
+				nmeabuf[char_cnt++] = '\n';
+				nmeabuf[char_cnt] = '\0';
+
+				if ( gp_type == GP_RMC )
+				{
+					if ( logging )
+					{
+						uint8_t q = fm_write(nmeabuf);
+						if ( q > 250 )
+						{
+							FmStatus(q);
+						}
+						else
+						{
+							FmStatus(0);
+						}
+					}
+				}
+
+				// Process the sentence ... (todo)
+				char_cnt = 0xff;		// Wait for next sentence
+			}
+			else
+			if ( char_cnt < 80 )
+			{
+				nmeabuf[char_cnt] = ch;
 				char_cnt++;
 				if ( char_cnt == 15 )
 				{
-					if ( buf[0] == 'G' && 	// Unrolled strncmp() ;-)
-						 buf[1] == 'P' && 
-						 buf[2] == 'R' && 
-						 buf[3] == 'M' && 
-						 buf[4] == 'C' && 
-						 buf[5] == ',')
+					if ( nmeabuf[1] == 'G' && 	// Unrolled strncmp() ;-)
+						 nmeabuf[2] == 'P' && 
+						 nmeabuf[3] == 'R' && 
+						 nmeabuf[4] == 'M' && 
+						 nmeabuf[5] == 'C' && 
+						 nmeabuf[6] == ',')
 					{
-						display_time(&buf[6]);
+						gp_type = GP_RMC;
+						display_time(&nmeabuf[7]);
 					}
-					char_cnt = 0xff;		// Wait for next sentence
 				}
 			}
-
+			else
+			if ( char_cnt != 0xff )
+			{
+				blip('!');
+			}
+#if 0
 			// Forward the character to the NMEA processor
 			if ( nmea.process(ch) )
 			{
@@ -197,6 +236,7 @@ void setup(void)
 					}
 				}
 		    }
+#endif
 		}
 	}
 }
