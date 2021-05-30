@@ -25,4 +25,6 @@ extern uint8_t fm_open(void);
 extern uint8_t fm_close(void);
 extern uint8_t fm_write(const char *line);
 
+extern void blip(char c);
+
 #endif

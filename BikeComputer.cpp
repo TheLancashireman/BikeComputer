@@ -36,8 +36,25 @@ pcf2119r lcd;
 static void display_time(char *b);
 static void display_degrees(uint8_t col, char dir, long angle);
 
+// Low-overhead debugging
+uint8_t nblip;
+void blip(char c)
+{
+	Serial.write(c);
+	nblip++;
+	if ( nblip >= 80 )
+	{
+		nblip = 0;
+		Serial.write('\r');
+		Serial.write('\n');
+	}
+	lcd.setCursor(10,1);
+	lcd.write(c);
+}
+
 void LcdStatus(uint8_t where, int status)
 {
+#if 0
 	if ( status != 0 )
 	{
 		Serial.print("Lcd status in ");
@@ -47,14 +64,19 @@ void LcdStatus(uint8_t where, int status)
 
 		hd44780::fatalError(status);
 	}
+#endif
 }
 
 void FmStatus(uint8_t err)
 {
 	if ( err != 0 )
 	{
+#if 0
 		Serial.print("Fm status = ");
 		Serial.println(err);
+#endif
+		lcd.setCursor(12,1);
+		lcd.print(err);
 	}
 }
 
@@ -75,7 +97,6 @@ void setup(void)
     digitalWrite(LED1, LOW);
 
 	Serial.begin(9600);
-	Serial.println("Hello, World!");
 
 	int status = lcd.begin(16, 2);
 	LcdStatus(40,  status);
@@ -86,16 +107,13 @@ void setup(void)
 	status = lcd.command(0x80+31);	// Set Va = 4.3v
 	LcdStatus(42, status);
 
-	lcd.command(0xc0+31);	// Set Vb = 4.3v
+	lcd.command(0xc0+31);			// Set Vb = 4.3v
 	LcdStatus(43, status);
 
 	status = lcd.command(0x34);		// Switch to normal command mode
 	LcdStatus(44, status);
 
-	status = lcd.clear();
-	LcdStatus(45, status);
-
-	status = lcd.display();
+	status = lcd.display();			// Turn on display
 	LcdStatus(46, status);
 
 	lcd.clear_row(0);
@@ -107,13 +125,10 @@ void setup(void)
 	FmStatus(status);
 	if ( status == 0 )
 	{
-		Serial.println("fm_init() ok ");
-
 		status = fm_open();
 		FmStatus(status);
 		if ( status == 0 )
 		{
-			Serial.println("fm_open() ok ");
 			logging = 1;
 		}
 	}
@@ -231,9 +246,15 @@ void setup(void)
 						display_degrees(8, 'E', p);
 					}
 				}
-				const char *s = nmea.getSentence();
-				fm_write(s);
-				//Serial.println(s);
+				if ( logging )
+				{
+					const char *s = nmea.getSentence();
+					uint8_t q = fm_write(s);
+					if ( q > 250 )
+					{
+						FmStatus(q);
+					}
+				}
 		    }
 		}
 	}

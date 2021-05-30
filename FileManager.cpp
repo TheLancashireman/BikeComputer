@@ -22,6 +22,7 @@
 #include <SPI.h>
 #include "SdFat.h"
 #include "sdios.h"
+#include "FileManager.h"
 
 /* See SdFat/examples/QuickStart/QuickStart.ino for full descriptions. This is a cut-down version
 */
@@ -32,7 +33,7 @@
 
 SdFat32 sd;
 File32 file;
-uint32_t byte_count;
+uint16_t byte_count;
 
 const int8_t DISABLE_CHIP_SELECT = -1;
 
@@ -98,30 +99,20 @@ uint8_t fm_init(void)
 
 uint8_t fm_close(void)
 {
-	if ( file.isOpen() )
-	{
-		file.close();
-	}
+	file.sync();
+	file.close();
 }
 
 uint8_t fm_open(void)
 {
-	if ( file.isOpen() )
-	{
-		file.close();
-	}
-
 	while ( sd.exists(fn) )
 	{
 		if ( incFn() )
 			return 105;		// Unlikely; SD card contains at least 10000 files.
 	}
-	Serial.println(fn);
 
-	if ( !file.open(fn, O_RDWR | O_CREAT | O_AT_END) )
+	if ( !file.open(fn, O_WRONLY | O_CREAT | O_AT_END) )
 	{
-		Serial.print("open error code ");
-		Serial.println(file.getError());
 		return 106;
 	}
 
@@ -132,15 +123,28 @@ uint8_t fm_open(void)
 // Assumption: line has non-zero length
 uint8_t fm_write(const char *line)
 {
-	if ( file.isOpen() )
+	size_t s = file.write(line);
+	if ( s <= 0 )
 	{
-		size_t s = file.write(line);
-		if ( s < 0 )
-			return 0;
-		if ( file.write('\n') <= 0 )
-			return 0;
-		Serial.println(line);
-		return (uint8_t)s;
+		blip('0');
+		return 255;
 	}
-	return 0;
+	if ( file.write('\n') <= 0 )
+	{
+		blip('?');
+		return 254;
+	}
+	byte_count += s + 1;
+	if ( byte_count >= 1024 )
+	{
+		file.sync();
+		byte_count &= 1023;
+		blip('+');
+	}
+	else
+	{
+		blip('.');
+	}
+
+	return (uint8_t)s;
 }
