@@ -14,7 +14,6 @@ ARDUINO_ETC_PATH		= $(ARDUINO_TOOLS_PATH)/avr/etc
 AVR_TOOLS_PATH			= $(ARDUINO_TOOLS_PATH)/avr/bin
 
 PRJ_INCLUDES            += -I../arduino/libraries/SdFat/src
-PRJ_INCLUDES            += -I../arduino/libraries/MicroNMEA/src
 PRJ_INCLUDES            += -I../arduino/libraries/hd44780
 PRJ_INCLUDES            += -I../arduino/libraries/hd44780/hd44780ioClass
 PRJ_INCLUDES			+= -I../arduino/arduino-1.8.13/hardware/arduino/avr/libraries/Wire/src
@@ -25,9 +24,6 @@ OTHER_OBJS				+= $(OBJDIR)/Wire.o
 OTHER_OBJS				+= $(OBJDIR)/hd44780.o
 OTHER_OBJS				+= $(OBJDIR)/pcf2119r.o
 OTHER_OBJS				+= $(OBJDIR)/twi.o
-
-# GPS (NMEA) library
-OTHER_OBJS				+= $(OBJDIR)/MicroNMEA.o
 
 # SD card library
 OTHER_OBJS				+= $(OBJDIR)/FatFileSFN.o
@@ -49,9 +45,6 @@ $(OBJDIR)/hd44780.o:	../arduino/libraries/hd44780/hd44780.cpp
 	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
 
 $(OBJDIR)/pcf2119r.o:	../arduino/libraries/hd44780/hd44780ioClass/pcf2119r.cpp
-	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
-
-$(OBJDIR)/MicroNMEA.o:	../arduino/libraries/MicroNMEA/src/MicroNMEA.cpp
 	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
 
 $(OBJDIR)/twi.o:		../arduino/arduino-1.8.13/hardware/arduino/avr/libraries/Wire/src/utility/twi.c

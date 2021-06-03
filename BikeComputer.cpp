@@ -1,4 +1,4 @@
-/* BikeComputer - a bike computer with GPS receiver and route logger
+/* BikeComputer - a bike computer with GPS receiver and route loggergps_decode(gpsbuf);
  *
  * (c) David Haworth
  *
@@ -21,20 +21,11 @@
 #include <Arduino.h>
 #include <ctype.h>
 #include <pcf2119r.h>
-#if 0
-#include <MicroNMEA.h>
-#endif
 #include "BikeComputer.h"
 
-char nmeabuf[85];
-#if 0
-MicroNMEA nmea(nmeabuf, sizeof(nmeabuf));
-#endif
-
+char gpsbuf[85];
 pcf2119r lcd;
-
-static void display_time(char *b);
-static void display_degrees(uint8_t col, char dir, long angle);
+uint8_t modes;
 
 // Low-overhead debugging
 uint8_t nblip;
@@ -52,6 +43,7 @@ void blip(char c)
 	lcd.write(c);
 }
 
+// Display/log SD card problems
 void FmStatus(uint8_t err)
 {
 	lcd.setCursor(11,1);
@@ -67,12 +59,11 @@ void FmStatus(uint8_t err)
 	}
 }
 
+// The real main()
 void setup(void)
 {
-	uint8_t mode_change = 1;
-	uint8_t logging = 0;
+	modes |= MODE_CHANGE;
 	uint8_t char_cnt = 0xff;
-	uint8_t gp_type = GP_NONE;
 	
 	pinMode(LED1, OUTPUT);
     digitalWrite(LED1, LOW);
@@ -99,7 +90,7 @@ void setup(void)
 		FmStatus(status);
 		if ( status == 0 )
 		{
-			logging = 1;
+			modes |= MODE_LOGGING;
 		}
 	}
 
@@ -107,7 +98,7 @@ void setup(void)
 	btn_init();
 
 	lcd.setCursor(15,1);
-	lcd.write(logging ? '+' : '-');
+	lcd.write((modes & MODE_LOGGING) == 0 ? '-' : '+');
 
 	for (;;)
 	{
@@ -117,9 +108,9 @@ void setup(void)
 		if ( btn == 1 )
 		{
 			blip('1');
-			if ( logging )
+			if ( modes & MODE_LOGGING )
 			{
-				logging = 0;
+				modes &= ~MODE_LOGGING;
 				fm_close();
 				lcd.setCursor(15,1);
 				lcd.write('-');
@@ -130,7 +121,7 @@ void setup(void)
 				FmStatus(status);
 				if ( status == 0 )
 				{
-					logging = 1;
+					modes |= MODE_LOGGING;
 					lcd.setCursor(15,1);
 					lcd.write('+');
 				}
@@ -142,21 +133,22 @@ void setup(void)
 		{
 			if ( ch == '$' )
 			{
-				nmeabuf[0] = '$';
+				gpsbuf[0] = '$';
 				char_cnt = 1;
-				gp_type = GP_NONE;
 			}
 			else
 			if ( ch == '\0' || ch == '\r' || ch == '\n' )
 			{
-				nmeabuf[char_cnt++] = '\n';
-				nmeabuf[char_cnt] = '\0';
+				gpsbuf[char_cnt++] = '\n';
+				gpsbuf[char_cnt] = '\0';
+
+				uint8_t gp_type = gps_decode(gpsbuf);
 
 				if ( gp_type == GP_RMC )
 				{
-					if ( logging )
+					if ( modes & MODE_LOGGING )
 					{
-						uint8_t q = fm_write(nmeabuf);
+						uint8_t q = fm_write(gpsbuf);
 						if ( q > 250 )
 						{
 							FmStatus(q);
@@ -168,82 +160,27 @@ void setup(void)
 					}
 				}
 
-				// Process the sentence ... (todo)
-				char_cnt = 0xff;		// Wait for next sentence
+				char_cnt = 255;		// Wait for next sentence
 			}
 			else
 			if ( char_cnt < 80 )
 			{
-				nmeabuf[char_cnt] = ch;
+				gpsbuf[char_cnt] = ch;
 				char_cnt++;
-				if ( char_cnt == 15 )
-				{
-					if ( nmeabuf[1] == 'G' && 	// Unrolled strncmp() ;-)
-						 nmeabuf[2] == 'P' && 
-						 nmeabuf[3] == 'R' && 
-						 nmeabuf[4] == 'M' && 
-						 nmeabuf[5] == 'C' && 
-						 nmeabuf[6] == ',')
-					{
-						gp_type = GP_RMC;
-						display_time(&nmeabuf[7]);
-					}
-				}
 			}
 			else
-			if ( char_cnt != 0xff )
-			{
+			if ( char_cnt != 255 )
+			{	// Over-length line
 				blip('!');
 			}
-#if 0
-			// Forward the character to the NMEA processor
-			if ( nmea.process(ch) )
-			{
-				// Sentence received: what is it?
-				if ( nmea.isValid() )
-				{
-					if ( mode_change )
-					{
-						lcd.clear_row(0);
-						mode_change = 0;
-					}
-					long p = nmea.getLatitude();
-					if ( p < 0 )
-					{
-						display_degrees(0, 'S', -p);
-					}
-					else
-					{
-						display_degrees(0, 'N', p);
-					}
-					p = nmea.getLongitude();
-					if ( p < 0 )
-					{
-						display_degrees(8, 'W', -p);
-					}
-					else
-					{
-						display_degrees(8, 'E', p);
-					}
-				}
-				if ( logging )
-				{
-					const char *s = nmea.getSentence();
-					uint8_t q = fm_write(s);
-					if ( q > 250 )
-					{
-						FmStatus(q);
-					}
-				}
-		    }
-#endif
 		}
 	}
 }
 
 void loop() {}
 
-static void display_time(char *b)
+// Display the time in a GPRMC record
+void display_time(const char *b)
 {
 	lcd.setCursor(0,1);
 	if ( isdigit(b[0]) && isdigit(b[1]) && isdigit(b[2]) && isdigit(b[3]) && isdigit(b[4]) && isdigit(b[5]) )
@@ -263,12 +200,154 @@ static void display_time(char *b)
 	}
 }
 
-static void display_degrees(uint8_t col, char dir, long angle)
+// Disply part of co-ordinates
+// Format is dddd.pppp,N
+// dddd = degrees and minutes; minutes must be 2 digits, degrees could be 1 to 3 digits.
+// After the comma, N, S, E or W
+void display_degrees(const char *b)
 {
-	lcd.setCursor(col,0);
-	lcd.write(dir);
-	angle = (angle+500L)/1000L;				// Round to nearest. Do this as integer to avoid loss of accuracy
-	double deg = ((double)angle/1000.0);
-	lcd.print(deg, 3);
-	lcd.write(' ');
+	uint8_t i, dp, comma, col;
+	char x;
+	uint16_t f;
+
+	for ( i = 0; b[i] != '.'; i++ )		// Find the decimal point
+	{
+		if ( !isdigit(b[i]) )
+			return;						// Not-a-digit found before dp; bad data
+	}
+
+	if ( i < 3 )
+		return;							// Not enough digits; bad data
+
+	dp = i;								// Index of dp.
+	i++;								// Skip the dp
+
+	for ( ; b[i] != ','; i++ )			// Find the comma
+	{
+		if ( !isdigit(b[i]) )
+			return;						// Not-a-digit found before comma; bad data
+	}
+
+	comma = i;							// Index of comma
+	i++;								// Skip the comma
+
+	if ( b[i] == 'N' || b[i] == 'S' )	// Latitude?
+		col = 0;						// Display latitude at column 0
+	else
+	if ( b[i] == 'E' || b[i] == 'W' )	// Longitude?
+		col = 8;						// Display longitude at column 8
+	else
+		return;							// Unrecognised direction; bad data
+	
+	lcd.setCursor(col,0);				// Cursor to start of output field
+	for ( uint8_t j = 0; j < 8; j++ )	// Clear output field (half of top line)
+		lcd.write(' ');
+
+	lcd.setCursor(col,0);				// Cursor to start of output field
+	lcd.write(b[i]);					// Direction
+	for ( i = 0; i < (dp - 2); i++ )	// Degrees
+		lcd.write(b[i]);
+
+	// Convert minutes and fractional minutes to 1000ths of degrees
+	// Need 1000ths of minutes divided by 60
+	// Equivalent to 100ths of minutes dvided by 6
+	// Need whole minutes and first 2 digits after dp
+	f = digit_to_num(b[dp-2]) * 10 + digit_to_num(b[dp-1]);
+	f = f * 10;
+	if ( isdigit(b[dp+1]) )
+		f += digit_to_num(b[dp+1]);
+	f = f * 10;
+	if ( isdigit(b[dp+2]) )
+		f += digit_to_num(b[dp+2]);		// f is now in 100ths of minutes
+	f = f/6;							// f is now in 1000ths of degrees
+
+	lcd.write('.');
+	x = f/100;
+	lcd.write(x + '0');
+	x = (f/10) - 10*x;
+	lcd.write(x + '0');
+	lcd.write(f % 10 + '0');
 }
+
+// Display speed
+// Speed is given in knots (dd.ff)
+// Have to convert to km/h
+void display_speed(const char *b)
+{
+	uint8_t kn = 0;
+	uint16_t f_kn = 0;
+	uint16_t div = 1;
+	uint8_t i;
+
+	// Work in integers for the whole number and fractional parts
+	for ( i = 0; b[i] != '.'; i++ )		// Whole number part
+	{
+		if ( !isdigit(b[i]) )
+			return;						// Not-a-digit found; bad data
+		kn = kn * 10 + digit_to_num(b[i]);
+	}
+	i++;								// Skip over dp
+	for ( ; b[i] != ','; i++ )			// Fractional part
+	{
+		if ( !isdigit(b[i]) )
+			return;						// Not-a-digit found; bad data
+		f_kn = f_kn * 10 + digit_to_num(b[i]);
+		div = div * 10;
+	}
+
+	double speed = (double)kn + (double)f_kn / (double)div;		// knots
+	speed = speed * 1.852001;									// km/h
+
+	lcd.setCursor(0,0);					// Cursor to start of output field
+	lcd.print(speed, 2);
+	lcd.print(F(" km/h "));
+}
+
+// Display heading
+// Copy field to display. At most 5 characters, stop when not a digit or dp.
+void display_heading(const char *b)
+{
+	uint8_t i;
+	lcd.setCursor(11,0);				// Cursor to start of output field
+	for ( i = 0; i < 5; i++ )			// At most 5 characters
+	{
+		if ( b[i] == '.' || isdigit(b[i]) )
+			lcd.write(b[i]);
+		else
+			return;
+	}
+}
+
+// Display date
+// Format of input is DDMMYY
+// Write in ISO form YYYY-MM-DD (assume 20xx)
+void display_date(const char *b)
+{
+	uint8_t i;
+
+	for ( i = 0; i < 6; i++ )
+	{
+		if ( !isdigit(b[i]) )
+			return;
+	}
+	lcd.setCursor(0,0);					// Cursor to start of output field
+	lcd.write('2');
+	lcd.write('0');
+	lcd.write(b[4]);
+	lcd.write(b[5]);
+	lcd.write('-');
+	lcd.write(b[2]);
+	lcd.write(b[3]);
+	lcd.write('-');
+	lcd.write(b[0]);
+	lcd.write(b[1]);
+}
+
+#if DBG
+// Host debugging
+#include <stdio.h>
+void debug_print(const char *s)
+{
+	printf("\nDBG: %s\n", s);
+}
+#endif
