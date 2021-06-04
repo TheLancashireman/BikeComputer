@@ -100,6 +100,7 @@ uint8_t fm_init(void)
 uint8_t fm_close(void)
 {
 	file.sync();
+	delay(100);
 	file.close();
 }
 
@@ -124,20 +125,26 @@ uint8_t fm_open(void)
 uint8_t fm_write(const char *line)
 {
 	if ( line[0] == '\0' )
-		return 253;
+		return 255;
 
 	size_t s = file.write(line);
+
+#if 0
+	if ( !file.close() )
+	{
+		blip(' ');
+		return 107;
+	}
+#endif
+
 	if ( s <= 0 )
 	{
-		blip('0');
-		return 255;
+		blip(' ');
+		return 108;
 	}
 	blip('.');
 
-	return (uint8_t)s;
-}
-
-#if 0
+#if 1
 	byte_count += s;
 	if ( byte_count >= 1024 )
 	{
@@ -149,7 +156,7 @@ uint8_t fm_write(const char *line)
 	{
 		blip('.');
 	}
+#endif
 
 	return (uint8_t)s;
 }
-#endif
