@@ -21,7 +21,7 @@
 #include <Arduino.h>
 #include "BikeComputer.h"
 
-#define DEBOUNCE	50
+#define DEBOUNCE	100
 
 uint8_t button_time = 0;
 uint8_t button = 0;
@@ -45,13 +45,13 @@ uint8_t btn_read(uint8_t elapsed)
 			if ( b1 == LOW )
 			{
 				button = 1;
-				button_time = 50;
+				button_time = DEBOUNCE;
 			}
 			else
 			if ( b2 == LOW )
 			{
 				button = 2;
-				button_time = 50;
+				button_time = DEBOUNCE;
 			}
 			return button;
 		}
@@ -65,7 +65,7 @@ uint8_t btn_read(uint8_t elapsed)
 			{
 				// Yes. Clear button and don't look again until debounce finished
 				button = 0;
-				button_time = 50;
+				button_time = DEBOUNCE;
 			}
 		}
 	}
