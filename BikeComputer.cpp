@@ -80,6 +80,7 @@ void setup(void)
 	lcd.clear_row(1);
 	lcd.setCursor(0,0);				// Boring welcome message
 	lcd.print(F("Bike Computer!"));
+	delay(1000);
 
 	status = fm_init();				// Initialise SD card interface
 	FmStatus(status);
@@ -114,6 +115,7 @@ void setup(void)
 				fm_close();
 				lcd.setCursor(15,1);
 				lcd.write('-');
+				FmStatus(0);
 			}
 			else
 			{
@@ -137,41 +139,43 @@ void setup(void)
 				char_cnt = 1;
 			}
 			else
-			if ( ch == '\0' || ch == '\r' || ch == '\n' )
+			if ( char_cnt < 82 )
 			{
-				gpsbuf[char_cnt++] = '\n';
-				gpsbuf[char_cnt] = '\0';
-
-				uint8_t gp_type = gps_decode(gpsbuf);
-
-				if ( gp_type == GP_RMC )
+				if ( ch == '\0' || ch == '\r' || ch == '\n' )
 				{
-					if ( modes & MODE_LOGGING )
+					gpsbuf[char_cnt++] = '\n';
+					gpsbuf[char_cnt] = '\0';
+
+					uint8_t gp_type = gps_decode(gpsbuf);
+
+					if ( gp_type == GP_RMC )
 					{
-						uint8_t q = fm_write(gpsbuf);
-						if ( q > 250 )
+						if ( modes & MODE_LOGGING )
 						{
-							FmStatus(q);
-						}
-						else
-						{
-							FmStatus(0);
+							uint8_t q = fm_write(gpsbuf);
+							if ( q > 250 )
+							{
+								FmStatus(q);
+							}
+							else
+							{
+								FmStatus(0);
+							}
 						}
 					}
-				}
 
-				char_cnt = 255;		// Wait for next sentence
-			}
-			else
-			if ( char_cnt < 80 )
-			{
-				gpsbuf[char_cnt] = ch;
-				char_cnt++;
-			}
-			else
-			if ( char_cnt != 255 )
-			{	// Over-length line
-				blip('!');
+					char_cnt = 255;		// Wait for next sentence
+				}
+				else
+				if ( char_cnt < 80 )
+				{
+					gpsbuf[char_cnt] = ch;
+					char_cnt++;
+				}
+				else
+				{	// Over-length line
+					blip('!');
+				}
 			}
 		}
 	}

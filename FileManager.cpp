@@ -111,7 +111,7 @@ uint8_t fm_open(void)
 			return 105;		// Unlikely; SD card contains at least 10000 files.
 	}
 
-	if ( !file.open(fn, O_WRONLY | O_CREAT | O_TRUNC) )
+	if ( !file.open(fn, O_WRONLY | O_CREAT | O_AT_END) )
 	{
 		return 106;
 	}
@@ -123,20 +123,21 @@ uint8_t fm_open(void)
 // Assumption: line has non-zero length
 uint8_t fm_write(const char *line)
 {
+	if ( line[0] == '\0' )
+		return 253;
+
 	size_t s = file.write(line);
 	if ( s <= 0 )
 	{
 		blip('0');
 		return 255;
 	}
+	blip('.');
+
+	return (uint8_t)s;
+}
+
 #if 0
-	if ( file.write('\n') <= 0 )
-	{
-		blip('?');
-		return 254;
-	}
-	byte_count += 1;
-#endif
 	byte_count += s;
 	if ( byte_count >= 1024 )
 	{
@@ -151,3 +152,4 @@ uint8_t fm_write(const char *line)
 
 	return (uint8_t)s;
 }
+#endif
