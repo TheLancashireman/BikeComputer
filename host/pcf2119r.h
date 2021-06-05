@@ -9,13 +9,11 @@ class pcf2119r
 public:
 	static inline void setCursor(uint8_t col, uint8_t row)
 	{
-//		printf("\n");
-		printf("   ");
+		printf("\n LCD(%d,%d): ", col, row);
 	}
 
 	static inline int write(const char *s)
 	{
-//		return printf("%s\n", s);
 		return printf("%s", s);
 	}
 

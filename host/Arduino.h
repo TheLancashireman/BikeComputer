@@ -37,10 +37,7 @@ public:
 	{
 		putc(c, stdout);
 	}
-	static inline int read(void)
-	{
-		return -1;
-	}
+	int read(void);
 };
 
 extern arduino_serial Serial;
