@@ -21,7 +21,7 @@
 #include <Arduino.h>
 #include "BikeComputer.h"
 
-#define DEBOUNCE	100
+#define DEBOUNCE	200
 
 uint8_t button_time = 0;
 uint8_t button = 0;

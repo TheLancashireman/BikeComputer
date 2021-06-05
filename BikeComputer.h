@@ -42,13 +42,28 @@
 
 // Operating modes. Bit-fields define modes
 extern uint8_t modes;
-#define MODE_LOGGING	0x80	// True or false
-#define MODE_CHANGE		0x10	// Display mode has changed
-#define MODE_DISPLAY	0x07	// What to display?
-#define MODE_POSN		0x00	// Display lat/long coordinates
-#define MODE_SPEED		0x01	// Display GPS speed and heading
-#define MODE_DATE		0x02	// Display date
-#define MODE_NMODE		0x03	// No. of modes
+#define MODE_LOGGING			0x80	// True or false
+
+#define MODE_DISPLAY_0			0x07	// What to display on top line?
+#define MODE_POSITION			0x00	// Display lat/long coordinates
+#define MODE_GPSSPEED_HEADING	0x01	// Display GPS speed and heading
+#define MODE_DATE_TIME			0x02	// Display date and time
+#define MODE_LOGGING_CTRL		0x03	// Display "Logging on/off"
+#define MODE_ENTER_MENU			0x04	// Menu
+#define MODE_ERROR				0x07	// Error code. Cannot step to this value
+#define MODE_MAX_0				0x04	// Max value of display mode 0
+#define MODE_INC_0				0x01	// Increment value for display mode 0
+
+#define MODE_DISPLAY_1			0x38	// What to display on bottom line?
+#define	MODE_TIME_WHEELSPEED	0x00	// Time and wheel speed
+#define	MODE_ELAPSED_WHEELSPEED	0x08	// Elapsed time and wheel speed
+#define	MODE_TIME_GPSSPEED		0x10	// Time and wheel speed
+#define	MODE_ELAPSED_GPSSPEED	0x18	// Elapsed time and wheel speed
+#define MODE_MAX_1				0x18	// Max value of display mode 1
+#define MODE_INC_1				0x08	// Increment value for display mode 1
+
+//
+extern uint16_t start_time;
 
 // File handling
 extern uint8_t fm_init(void);
@@ -60,9 +75,6 @@ extern uint8_t fm_write(const char *line);
 extern uint8_t gps_decode(const char *s);
 extern uint8_t find_next(const char *s, uint8_t i, uint8_t n, char c);
 
-// Debugging info
-extern void blip(char c);
-
 // Time measurement
 extern uint8_t tm_elapsed(void);
 extern void tm_init(void);
@@ -70,15 +82,34 @@ extern void tm_init(void);
 // Button handling
 extern void btn_init(void);
 extern uint8_t btn_read(uint8_t elapsed);
+extern void mode_control(uint8_t btn);
 
 // Display handling
 void display_time(const char *b);
+void display_date_time(const char *d, const char *t);
 void display_degrees(const char *b);
-void display_speed(const char *b);
+void display_gpsspeed(const char *b, uint8_t col, uint8_t row);
 void display_heading(const char *b);
 void display_date(const char *b);
+void display_logging(void);
+void display_menu(void);
+void display_elapsed_time(const char *t);
+void display_t16(uint16_t t);
+uint16_t time_to_t16(const char *t);
+void display_wheelspeed(void);
 
-static inline uint8_t digit_to_num(uint8_t d)
+static inline void display_gpsspeed_l0(const char *b)
+{
+	display_gpsspeed(b, 0, 0);
+}
+
+static inline void display_gpsspeed_l1(const char *b)
+{
+	display_gpsspeed(b, 9, 1);
+}
+
+
+static inline uint8_t d2n(uint8_t d)
 {
 	return d - '0';
 }

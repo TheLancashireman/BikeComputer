@@ -109,15 +109,42 @@ uint8_t find_next(const char *s, uint8_t i, uint8_t n, char c)
 static uint8_t decode_gprmc(const char *s)
 {
 	uint8_t i;
+	uint8_t gpsspeed_line1 = 0;
 
-	display_time(&s[7]);
+	if ( start_time == 0xffff )
+		start_time = time_to_t16(&s[7]);
+
+	if ( (modes & MODE_DISPLAY_1) == MODE_TIME_WHEELSPEED )
+	{
+		display_time(&s[7]);
+		display_wheelspeed();
+	}
+	else
+	if ( (modes & MODE_DISPLAY_1) == MODE_TIME_GPSSPEED )
+	{
+		display_time(&s[7]);
+		gpsspeed_line1 = 1;
+	}
+	else
+	if ( (modes & MODE_DISPLAY_1) == MODE_ELAPSED_WHEELSPEED )
+	{
+		display_elapsed_time(&s[7]);
+		display_wheelspeed();
+	}
+	else
+	if ( (modes & MODE_DISPLAY_1) == MODE_ELAPSED_GPSSPEED )
+	{
+		display_elapsed_time(&s[7]);
+		gpsspeed_line1 = 1;
+	}
+	
 
 	i = find_next(s, 7, 1, ',');
 	if ( s[i] != ',' )	return GP_ERR;
 	i++;
 
 	// i should now be the "position valid" flag
-	if ( (modes & MODE_DISPLAY) == MODE_POSN )
+	if ( (modes & MODE_DISPLAY_0) == MODE_POSITION )
 	{
 		// Check validity flag
 		if ( s[i] == 'A' && s[i+1] == ',' )
@@ -134,7 +161,6 @@ static uint8_t decode_gprmc(const char *s)
 				display_degrees(&s[i]);
 			}
 		}
-		return GP_RMC;
 	}
 
 	// Skip over the lat/long fields
@@ -142,13 +168,17 @@ static uint8_t decode_gprmc(const char *s)
 	if ( s[i] != ',' )	return GP_ERR;
 	i++;
 
-	if ( (modes & MODE_DISPLAY) == MODE_SPEED )
+	if ( gpsspeed_line1 )
 	{
-		display_speed(&s[i]);
+		display_gpsspeed_l1(&s[i]);
+	}
+
+	if ( (modes & MODE_DISPLAY_0) == MODE_GPSSPEED_HEADING )
+	{
+		display_gpsspeed_l0(&s[i]);
 		i = find_next(s, i, 1, ',');
 		i++;
 		display_heading(&s[i]);
-		return GP_RMC;
 	}
 
 	// Skip over the speed/heading fields
@@ -156,10 +186,9 @@ static uint8_t decode_gprmc(const char *s)
 	if ( s[i] != ',' )	return GP_ERR;
 	i++;
 
-	if ( (modes & MODE_DISPLAY) == MODE_DATE )
+	if ( (modes & MODE_DISPLAY_0) == MODE_DATE_TIME )
 	{
-		display_date(&s[i]);
-		return GP_RMC;
+		display_date_time(&s[i], &s[7]);
 	}
 	return GP_RMC;
 }

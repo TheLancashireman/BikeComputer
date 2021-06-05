@@ -129,34 +129,20 @@ uint8_t fm_write(const char *line)
 
 	size_t s = file.write(line);
 
-#if 0
-	if ( !file.close() )
-	{
-		blip(' ');
-		return 107;
-	}
-#endif
-
 	if ( s <= 0 )
 	{
-		blip(' ');
 		return 108;
 	}
-	blip('.');
 
-#if 1
 	byte_count += s;
 	if ( byte_count >= 1024 )
 	{
 		file.sync();
 		byte_count &= 1023;
-		blip('+');
 	}
 	else
 	{
-		blip('.');
 	}
-#endif
 
 	return (uint8_t)s;
 }
