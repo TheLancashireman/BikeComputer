@@ -238,8 +238,7 @@ void mode_control(uint8_t btn)
 		{
 			start_time = 0xffff;
 			distance = 0;
-			lcd.setCursor(6,0);
-			lcd.print(F("cleared"));
+			display_cleared();
 		}
 		else
 		if ( (modes & MODE_DISPLAY_0) == MODE_ENTER_MENU )
@@ -659,6 +658,13 @@ void display_trip(void)
 {
 	lcd.setCursor(0,0);
 	lcd.print(F("Trip: "));
+}
+
+// Display trip cleared
+void display_cleared(void)
+{
+	lcd.setCursor(6,0);
+	lcd.print(F("cleared"));
 }
 
 // Display menu entry

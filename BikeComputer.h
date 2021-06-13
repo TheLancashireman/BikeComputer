@@ -94,6 +94,7 @@ void display_heading(const char *b);
 void display_date(const char *b);
 void display_logging(void);
 void display_trip(void);
+void display_cleared(void);
 void display_menu(void);
 void display_elapsed_time(const char *t);
 void display_t16(uint16_t t);
