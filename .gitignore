@@ -1,1 +1,4 @@
 build-cli/
+host/simulator
+host/*.o
+gps/
