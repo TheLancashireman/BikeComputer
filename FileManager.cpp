@@ -117,6 +117,9 @@ uint8_t fm_open(void)
 		return 106;
 	}
 
+	byte_count = 0;
+	delay(100);
+
 	return 0;
 }
 
@@ -129,7 +132,7 @@ uint8_t fm_write(const char *line)
 
 	size_t s = file.write(line);
 
-	if ( s <= 0 )
+	if ( s == -1 )
 	{
 		return 108;
 	}

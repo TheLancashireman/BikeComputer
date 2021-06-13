@@ -34,6 +34,7 @@ uint8_t tm_elapsed(void)
 {
 	unsigned long now = millis();
 	unsigned long elapsed = now - then;
+	then = now;
 	if ( elapsed > 255 )
 		return 255;
 	return (uint8_t)elapsed;

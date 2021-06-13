@@ -17,17 +17,33 @@
  *	You should have received a copy of the GNU General Public License
  *	along with BikeComputer.  If not, see <http://www.gnu.org/licenses/>.
 */
+#define USE_PCF2119R	0
 
 #include <Arduino.h>
 #include <ctype.h>
+
+#if USE_PCF2119R
 #include <pcf2119r.h>
+#else
+#include <LiquidCrystal.h>
+#endif
+
 #include "BikeComputer.h"
 
 char gpsbuf[85];
 uint8_t gpscnt;
+
+#if USE_PCF2119R
 pcf2119r lcd;
+#else
+//				   rs, e, d4, d5, d6, d7
+LiquidCrystal lcd(  9, 8,  4,  5,  6,  7);
+#endif
+
+
 uint8_t modes;
 uint16_t start_time;
+uint32_t distance;
 
 // Display/log SD card problems
 void FmStatus(uint8_t err)
@@ -41,9 +57,20 @@ void FmStatus(uint8_t err)
 	}
 }
 
+static void lcd_clear_row(uint8_t row)
+{
+	lcd.setCursor(0, row);
+	for ( uint8_t i = 0; i < 16; i++ )
+	{
+		lcd.write(' ');
+	}
+}
+
 // The real main()
 void setup(void)
 {
+	int status;
+
 	start_time = 0xffff;
 
 	pinMode(LED1, OUTPUT);
@@ -51,16 +78,22 @@ void setup(void)
 
 	Serial.begin(9600);
 
-	int status = lcd.begin(16, 2);
-	status = lcd.command(0x35);		// Switch to extended command mode
-	status = lcd.command(0x80+31);	// Set Va = 4.3v
+	lcd.begin(16, 2);
+
+#if USE_PCF2119R
+	lcd.command(0x35);				// Switch to extended command mode
+	lcd.command(0x80+31);			// Set Va = 4.3v
 	lcd.command(0xc0+31);			// Set Vb = 4.3v
-	status = lcd.command(0x34);		// Switch to normal command mode
-	status = lcd.display();			// Turn on display
-	lcd.clear_row(0);				// Clear display. clear() doesn't work in this hardware
-	lcd.clear_row(1);
+	lcd.command(0x34);				// Switch to normal command mode
+	lcd.display();					// Turn on display
+#else
+#endif
+	lcd_clear_row(0);				// Clear display. clear() doesn't work in this hardware
+	lcd_clear_row(1);
+
 	lcd.setCursor(0,0);				// Boring welcome message
 	lcd.print(F("Bike Computer!"));
+
 	delay(1000);
 
 	status = fm_init();				// Initialise SD card interface
@@ -101,8 +134,8 @@ void loop()
 		{
 			if ( ch == '\0' || ch == '\r' || ch == '\n' )
 			{
-				gpsbuf[gpscnt++] = '\n';
-				gpsbuf[gpscnt] = '\0';
+				gpsbuf[gpscnt] = '\n';
+				gpsbuf[gpscnt+1] = '\0';
 
 				uint8_t gp_type = gps_decode(gpsbuf);
 
@@ -150,10 +183,15 @@ void mode_control(uint8_t btn)
 			modes = modes & ~MODE_DISPLAY_0;
 		}
 
-		lcd.clear_row(0);
+		lcd_clear_row(0);
 		if ( (modes & MODE_DISPLAY_0) == MODE_LOGGING_CTRL )
 		{
 			display_logging();
+		}
+		else
+		if ( (modes & MODE_DISPLAY_0) == MODE_TRIP_CTRL )
+		{
+			display_trip();
 		}
 		else
 		if ( (modes & MODE_DISPLAY_0) == MODE_ENTER_MENU )
@@ -186,6 +224,14 @@ void mode_control(uint8_t btn)
 			}
 		}
 		else
+		if ( (modes & MODE_DISPLAY_0) == MODE_TRIP_CTRL )
+		{
+			start_time = 0xffff;
+			distance = 0;
+			lcd.setCursor(6,0);
+			lcd.print(F("cleared"));
+		}
+		else
 		if ( (modes & MODE_DISPLAY_0) == MODE_ENTER_MENU )
 		{	// To do: state machine
 		}
@@ -199,7 +245,7 @@ void mode_control(uint8_t btn)
 			{
 				modes = modes & ~MODE_DISPLAY_1;
 			}
-			lcd.clear_row(1);
+			lcd_clear_row(1);
 			lcd.setCursor(0,1);
 			lcd.print(F("---"));
 		}
@@ -427,6 +473,12 @@ void display_date_time(const char *d, const char *t)
 	}
 }
 
+void display_blank_time(void)
+{
+	lcd.setCursor(0, 1);
+	lcd.print(F("--:--:--"));
+}
+
 // Convert ascii time to 16-bit decimal (scaled in units of 2 seconds)
 // A time of day in seconds is 86400; too big for 16 bits
 uint16_t time_to_t16(const char *t)
@@ -449,13 +501,20 @@ uint16_t time_to_t16(const char *t)
 // Calculate and display the elapsed time
 void display_elapsed_time(const char *t)
 {
+	if ( start_time == 0xffff )
+	{
+		display_blank_time();
+		return;
+	}
+
 	uint16_t t16 = time_to_t16(t);
 
 	if ( t16 == 0xffff )
 	{
-		t16 = 0;
+		display_blank_time();
+		return;
 	}
-	else
+
 	if ( t16 < start_time )
 	{	// Gone over midnight
 		t16 = t16 - start_time + 43200;		// Overflows intentional
@@ -472,7 +531,7 @@ void display_t16(uint16_t t)
 {
 	uint8_t s, m, h;
 
-	s = t%30;
+	s = (t%30) * 2;
 	t = t/30;
 	m = t%60;
 	h = t/60;
@@ -499,6 +558,13 @@ void display_logging(void)
 		lcd.print(F("off"));
 	else
 		lcd.print(F("on"));
+}
+
+// Display trip clear
+void display_trip(void)
+{
+	lcd.setCursor(0,0);
+	lcd.print(F("Trip: "));
 }
 
 // Display menu entry

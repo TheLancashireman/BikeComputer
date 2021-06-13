@@ -1,12 +1,16 @@
-#ifndef PCF2119R_H
-#define PCF2119R_H	1
+#ifndef LIQUIDCRYSTAL_H
+#define LIQUIDCRYSTAL_H	1
 
 #include <Arduino.h>
 #include <stdio.h>
 
-class pcf2119r
+class LiquidCrystal
 {
 public:
+	LiquidCrystal(uint8_t rs, uint8_t enable, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
+	{
+	}
+
 	static inline void setCursor(uint8_t col, uint8_t row)
 	{
 		printf("\n LCD(%d,%d): ", col, row);
@@ -53,10 +57,12 @@ public:
 		return 0;
 	}
 
+#if 0
 	static inline void clear_row(uint8_t r)
 	{
 		printf("\n");
 	}
+#endif
 };
 
 #endif
