@@ -17,31 +17,19 @@
  *	You should have received a copy of the GNU General Public License
  *	along with BikeComputer.  If not, see <http://www.gnu.org/licenses/>.
 */
-#define USE_PCF2119R	0
-
 #include <Arduino.h>
 #include <ctype.h>
-
-#if USE_PCF2119R
-#include <pcf2119r.h>
-#else
 #include <LiquidCrystal.h>
-#endif
-
 #include "BikeComputer.h"
 
 char gpsbuf[85];
 uint8_t gpscnt;
 
-#if USE_PCF2119R
-pcf2119r lcd;
-#else
 //				   rs, e, d4, d5, d6, d7
 LiquidCrystal lcd(  9, 8,  4,  5,  6,  7);
-#endif
 
-
-uint8_t modes;
+uint8_t modes;			// several modes in bitfields
+uint8_t update_delay;	// counter to delay regular update
 uint16_t start_time;
 uint32_t distance;
 
@@ -141,6 +129,11 @@ void loop()
 
 				if ( gp_type == GP_RMC )
 				{
+					if ( update_delay > 0 )	// Use RMC messages to time the update delay.
+					{
+						update_delay--;
+					}
+
 					if ( modes & MODE_LOGGING )
 					{
 						uint8_t q = fm_write(gpsbuf);
@@ -184,24 +177,41 @@ void mode_control(uint8_t btn)
 		}
 
 		lcd_clear_row(0);
-		if ( (modes & MODE_DISPLAY_0) == MODE_LOGGING_CTRL )
+		lcd.setCursor(0,0);
+		switch ( modes & MODE_DISPLAY_0 )
 		{
+		case MODE_POSITION:
+			//			 0123456789012345
+			lcd.print(F("Position"));
+			update_delay = 1;
+			break;
+
+		case MODE_GPSSPEED_HEADING:
+			//			 0123456789012345
+			lcd.print(F("Speed & heading"));
+			update_delay = 1;
+			break;
+
+		case MODE_DATE_TIME:
+			//			 0123456789012345
+			lcd.print(F("Date & time"));
+			update_delay = 1;
+			break;
+
+		case MODE_LOGGING_CTRL:
 			display_logging();
-		}
-		else
-		if ( (modes & MODE_DISPLAY_0) == MODE_TRIP_CTRL )
-		{
+			break;
+
+		case MODE_TRIP_CTRL:
 			display_trip();
-		}
-		else
-		if ( (modes & MODE_DISPLAY_0) == MODE_ENTER_MENU )
-		{
+			break;
+
+		case MODE_ENTER_MENU:
 			display_menu();
-		}
-		else
-		{
-			lcd.setCursor(0,0);
-			lcd.print(F("---"));
+			break;
+
+		default:
+			break;
 		}
 	}
 	else
@@ -245,9 +255,38 @@ void mode_control(uint8_t btn)
 			{
 				modes = modes & ~MODE_DISPLAY_1;
 			}
+
 			lcd_clear_row(1);
 			lcd.setCursor(0,1);
-			lcd.print(F("---"));
+			switch ( modes & MODE_DISPLAY_1 )
+			{
+			case MODE_TIME_WHEELSPEED:
+				//			 0123456789012345
+				lcd.print(F("Time/wheelspeed"));
+				update_delay = 1;
+				break;
+
+			case MODE_ELAPSED_WHEELSPEED:
+				//			 0123456789012345
+				lcd.print(F("Trip/wheelspeed"));
+				update_delay = 1;
+				break;
+
+			case MODE_TIME_GPSSPEED:
+				//			 0123456789012345
+				lcd.print(F("Time/GPS speed"));
+				update_delay = 1;
+				break;
+
+			case MODE_ELAPSED_GPSSPEED:
+				//			 0123456789012345
+				lcd.print(F("Trip/GPS speed"));
+				update_delay = 1;
+				break;
+
+			default:
+				break;
+			}
 		}
 	}
 }
@@ -258,6 +297,11 @@ void display_time(const char *b)
 {
 	uint8_t err = 0;
 	uint8_t i;
+
+	if ( update_delay > 0 )
+	{
+		return;
+	}
 
 	for ( i = 0; i < 6; i++ )
 	{
@@ -271,7 +315,7 @@ void display_time(const char *b)
 	lcd.setCursor(0,1);
 	if ( err )
 	{
-		lcd.print(F("--:--:--"));
+		lcd.print(F("--:--:-- "));
 	}
 	else
 	{
@@ -283,6 +327,7 @@ void display_time(const char *b)
 		lcd.write(':');
 		lcd.write(b[4]);
 		lcd.write(b[5]);
+		lcd.write(' ');
 	}
 }
 
@@ -295,6 +340,11 @@ void display_degrees(const char *b)
 	uint8_t i, dp, comma, col;
 	char x;
 	uint16_t f;
+
+	if ( update_delay > 0 )
+	{
+		return;
+	}
 
 	for ( i = 0; b[i] != '.'; i++ )		// Find the decimal point
 	{
@@ -360,23 +410,36 @@ void display_degrees(const char *b)
 // Have to convert to km/h
 void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
 {
-	uint8_t kn = 0;
-	uint16_t f_kn = 0;
+	uint8_t kn = 0;		// Whole number
+	uint16_t f_kn = 0;	// Fractional part
 	uint16_t div = 1;
 	uint8_t i;
+
+	if ( update_delay > 0 )
+	{
+		return;
+	}
+
+	lcd.setCursor(col,row);				// Cursor to start of output field
 
 	// Work in integers for the whole number and fractional parts
 	for ( i = 0; b[i] != '.'; i++ )		// Whole number part
 	{
 		if ( !isdigit(b[i]) )
-			return;						// Not-a-digit found; bad data
+		{								// Not-a-digit found; bad data
+			lcd.print(F(" -.-- km/h"));
+			return;
+		}
 		kn = kn * 10 + d2n(b[i]);
 	}
 	i++;								// Skip over dp
 	for ( ; b[i] != ','; i++ )			// Fractional part
 	{
 		if ( !isdigit(b[i]) )
-			return;						// Not-a-digit found; bad data
+		{								// Not-a-digit found; bad data
+			lcd.print(F(" -.-- km/h"));
+			return;
+		}
 		f_kn = f_kn * 10 + d2n(b[i]);
 		div = div * 10;
 	}
@@ -384,7 +447,6 @@ void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
 	double speed = (double)kn + (double)f_kn / (double)div;		// knots
 	speed = speed * 1.852001;									// km/h
 
-	lcd.setCursor(col,row);					// Cursor to start of output field
 	lcd.print(speed, 2);
 	lcd.print(F(" km/h "));
 }
@@ -393,8 +455,13 @@ void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
 // Wheel speed not implemented yet
 void display_wheelspeed(void)
 {
+	if ( update_delay > 0 )
+	{
+		return;
+	}
+
 	lcd.setCursor(9,1);
-	lcd.print(F("--.-- k"));
+	lcd.print(F(" 0.00  "));
 }
 
 // Display heading
@@ -402,6 +469,12 @@ void display_wheelspeed(void)
 void display_heading(const char *b)
 {
 	uint8_t i;
+
+	if ( update_delay > 0 )
+	{
+		return;
+	}
+
 	lcd.setCursor(11,0);				// Cursor to start of output field
 	for ( i = 0; i < 5; i++ )			// At most 5 characters
 	{
@@ -420,6 +493,11 @@ void display_date_time(const char *d, const char *t)
 	uint8_t i;
 	uint8_t err = 0;
 
+	if ( update_delay > 0 )
+	{
+		return;
+	}
+
 	for ( i = 0; i < 6; i++ )
 	{
 		if ( !isdigit(d[i]) )
@@ -431,8 +509,8 @@ void display_date_time(const char *d, const char *t)
 	lcd.setCursor(0,0);					// Cursor to start of output field
 	if ( err )
 	{
-		lcd.print(F("----------"));
-//					 YYYY-MM-DD
+		//			 0123456789
+		lcd.print(F("YYYY-MM-DD"));
 	}
 	else
 	{
@@ -461,7 +539,8 @@ void display_date_time(const char *d, const char *t)
 
 	if ( err )
 	{
-		lcd.print(F("--:--"));
+		//			 01234
+		lcd.print(F("hh:mm"));
 	}
 	else
 	{
@@ -475,8 +554,13 @@ void display_date_time(const char *d, const char *t)
 
 void display_blank_time(void)
 {
+	if ( update_delay > 0 )
+	{
+		return;
+	}
+
 	lcd.setCursor(0, 1);
-	lcd.print(F("--:--:--"));
+	lcd.print(F("--:--:-- "));
 }
 
 // Convert ascii time to 16-bit decimal (scaled in units of 2 seconds)
@@ -501,6 +585,11 @@ uint16_t time_to_t16(const char *t)
 // Calculate and display the elapsed time
 void display_elapsed_time(const char *t)
 {
+	if ( update_delay > 0 )
+	{
+		return;
+	}
+
 	if ( start_time == 0xffff )
 	{
 		display_blank_time();
@@ -530,6 +619,11 @@ void display_elapsed_time(const char *t)
 void display_t16(uint16_t t)
 {
 	uint8_t s, m, h;
+
+	if ( update_delay > 0 )
+	{
+		return;
+	}
 
 	s = (t%30) * 2;
 	t = t/30;
