@@ -23,34 +23,43 @@ arduino to the Rx pin of the receiver, you must use a level shifter there too.
 You need to disconnect the Tx pin of the receiver to update program the arduino, so use a switch or jumper
 in the circuit.
 
+#### MicroNMEA
+
+The MicroNMEA library extracts data from incoming GPS sentences and stores the information in variables.
+That uses a few bytes of RAM which (in combination with the I2C display and the SD card driver) is too
+much for the nano.
+
+Having eliminated the I2C display, there might be enough RAM to allow MicroNMEA to be used.
+However, decoding GPS sentences is quite straightforward, so this project no longer uses MicroNMEA.
+
 ### Display
 
-Settled on a more-or-less standard 2x16 LCD display - the Anag Vision. Details of others that were tried
-are below.
+The eventual choice is a more-or-less standard 2x16 LCD display - the Anag Vision. Details of this and
+the others that were tried are given below.
 
 #### Anag Vision AV1623
 
-The connector is 2x8 pins, located at one end, which makes the module a little longer than "standard"
+The connector has 2x8 pins, located at one end, which makes the module a little longer than "standard"
 displays.
 
-Needs LCD drive/contrast voltage on pin 3: connect a 10k preset potentiometer between 5v and gnd and connect the
-wiper to pin 3. Adjust until the display looks right.
+The module needs an LCD drive/contrast voltage on pin 3: connect a 10k preset potentiometer between 5v and GND
+and connect the wiper to pin 3. Adjust until the display looks right.
 
 Backlight LED current 130 mA at 4.2v according to datasheet.
 
-Series resistor: R = V/I ==> R = 0.8 / 0.13 = 6.2 Ohm. Still need experiments to determine good value.
+Series resistor: R = V/I ==> R = 0.8 / 0.13 = 6.2 Ohm. Still need experiments to determine a good value.
 
-In daylight, backlight is not needed.
+In daylight, the backlight is not needed.
 
 #### Noritake CU16025ECPB-W6J VFD
 
-Nice standard size, pinout and character set.
+A nice standard size, pinout and character set.
 
 Not easily readable in direct sunlight, so not suitable for this application
 
-#### Batron BTHQ 21605AV-YETF-LED04-I2C-5V LCD  (I2C, character set R)
+#### Batron BTHQ 21605AV-YETF-LED04-I2C-5V LCD  (I2C, PCF2119x controlller, character set R)
 
-The strange character set requires a hack to the hd44780 library.
+The strange character set needs a hack to the driver library.
 
 Backlight LED current 90mA at 4.1v
 
