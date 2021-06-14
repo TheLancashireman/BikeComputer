@@ -601,6 +601,7 @@ void display_blank_time(void)
 // A time of day in seconds is 86400; too big for 16 bits
 uint16_t time_to_t16(const char *t)
 {
+	uint32_t t32;
 	uint16_t t16;
 
 	for ( int i = 0; i < 6; i++ )
@@ -609,9 +610,10 @@ uint16_t time_to_t16(const char *t)
 			return 0xffff;
 	}
 
-	t16 = d2n(t[0]) * 10 + d2n(t[1]);					// Hours
-	t16 = t16 * 60 + d2n(t[2]) * 10 + d2n(t[3]);		// Convert hours to minutes and add minutes
-	t16 = t16 * 30 + d2n(t[4]) * 10 + d2n(t[5])/2;		// Convert minutes to 2secs and add seconds/2
+	t32 = d2n(t[0]) * 10 + d2n(t[1]);					// Hours
+	t32 = t32 * 60 + d2n(t[2]) * 10 + d2n(t[3]);		// Convert hours to minutes and add minutes
+	t32 = t32 * 60 + d2n(t[4]) * 10 + d2n(t[5]);		// Convert minutes to secs and add seconds
+	t16 = t32/2;
 
 	return t16;
 }
@@ -653,16 +655,18 @@ void display_elapsed_time(const char *t, uint8_t row)
 void display_t16(uint16_t t, uint8_t row, uint8_t odd)
 {
 	uint8_t s, m, h;
+	uint32_t t32;
 
 	if ( update_delay > 0 )
 	{
 		return;
 	}
 
-	s = (t%30) * 2;
-	t = t/30;
-	m = t%60;
-	h = t/60;
+	t32 = t * 2 + odd;
+	s = t32%60;
+	t32 = t32/60;
+	m = t32%60;
+	h = t32/60;
 
 	lcd.setCursor(0, row);
 	lcd.write((char)(h/10) + '0');
@@ -672,7 +676,7 @@ void display_t16(uint16_t t, uint8_t row, uint8_t odd)
 	lcd.write((char)(m%10) + '0');
 	lcd.write(':');
 	lcd.write((char)(s/10) + '0');
-	lcd.write((char)(s%10) + '0' + odd);
+	lcd.write((char)(s%10) + '0');
 	lcd.write(' ');
 }
 

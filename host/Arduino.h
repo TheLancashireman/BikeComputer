@@ -11,6 +11,7 @@
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
 
 static inline void pinMode(uint8_t pin, uint8_t mode)
 {
