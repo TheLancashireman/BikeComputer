@@ -78,9 +78,9 @@ The information presented on the top line is controlled by the MODE_DISPLAY_0 fi
 | Mode                    |0|1|2|3|4|5|6|7|8|9|0|1|2|3|4|5| Function                                  |
 | ------------------------|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-------------------------------------------|
 | MODE_POSITION           |N|1|2|.|3|4|5| |E|0|1|2|.|3|4|5| display_degrees()/display_degrees()       |
-| MODE_GPSSPEED_HEADING   |1|2|.|3|4|k|m|/|h| | |1|2|3|.|4| display_gpsspeed()/display_heading()      |
+| MODE_GPSSPEED_HEADING   |1|2|3|.|4|5| | | | |1|2|3|.|4|`| display_gpsspeed()/display_heading()      |
 | MODE_DATE_TIME          |Y|Y|Y|Y|-|M|M|-|D|D| |h|h|:|m|m| display_date_time()                       |
-| MODE_TRIP               |h|h|:|m|m|:|s|s| | |1|2|3|.|4|5| display_elapsed_time()/display_distance() |
+| MODE_TRIP               |h|h|:|m|m|:|s|s| |1|2|3|4|.|5|6| display_elapsed_time()/display_distance() |
 | MODE_LOGGING_CTRL       |L|o|g|g|i|n|g|:| |o|f|f| | | | | display_logging()                         |
 | MODE_TRIP_CTRL          |T|r|i|p|:| |c|l|e|a|r|e|d| | | | display_trip()/display_cleared()          |
 | MODE_ENTER_MENU         |S|e|t|t|i|n|g|s| | | | | | | | | display_menu()                            |
@@ -102,10 +102,10 @@ The information presented on the bottom line is controlled by the MODE_DISPLAY_1
 
 | Mode                    |0|1|2|3|4|5|6|7|8|9|0|1|2|3|4|5| Function                                    | Remark       |
 | ------------------------|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|---------------------------------------------|--------------|
-| MODE_TIME_WHEELSPEED    |h|h|:|m|m|:|s|s| |9|9|.|9|9|k|m| display_time()/display_wheelspeed()         |              |
-| MODE_ELAPSED_WHEELSPEED |h|h|:|m|m|:|s|s| |9|9|.|9|9|k|m| display_elapsed_time()/display_wheelspeed() |              |
-| MODE_TIME_GPSSPEED      |h|h|:|m|m|:|s|s| |9|9|.|9|9|k|m| display_time()/display_gpsspeed()           |              |
-| MODE_ELAPSED_GPSSPEED   |h|h|:|m|m|:|s|s| |9|9|.|9|9|k|m| display_elapsed_time()/display_gpsspeed()   |              |
+| MODE_TIME_WHEELSPEED    |h|h|:|m|m|:|s|s| | |1|2|3|.|4|5| display_time()/display_wheelspeed()         |              |
+| MODE_ELAPSED_WHEELSPEED |h|h|:|m|m|:|s|s| | |1|2|4|.|4|5| display_elapsed_time()/display_wheelspeed() |              |
+| MODE_TIME_GPSSPEED      |h|h|:|m|m|:|s|s| | |1|2|4|.|4|5| display_time()/display_gpsspeed()           |              |
+| MODE_ELAPSED_GPSSPEED   |h|h|:|m|m|:|s|s| | |1|2|4|.|4|5| display_elapsed_time()/display_gpsspeed()   |              |
 
 Pressing BTN2 when MODE_DISPLAY_0 is anything other than MODE_LOGGING_CTRL, MODE_TRIP_CTRL or MODE_ENTER_MENU
 steps through the modes from MODE_TIME_WHEELSPEED to MODE_ELAPSED_GPSSPEED.

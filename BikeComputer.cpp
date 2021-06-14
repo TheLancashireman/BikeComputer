@@ -30,20 +30,8 @@ LiquidCrystal lcd(  9, 8,  4,  5,  6,  7);
 
 uint8_t modes;			// several modes in bitfields
 uint8_t update_delay;	// counter to delay regular update
-uint16_t start_time;
-uint32_t distance;
-
-// Display/log SD card problems
-void FmStatus(uint8_t err)
-{
-	if ( err != 0 )
-	{
-		modes = modes | MODE_ERROR;		// All bits set.
-		lcd.setCursor(0,0);
-		lcd.print(F("File error "));
-		lcd.print(err);
-	}
-}
+uint16_t start_time;	// Unit: 2sec (1 = 2 seconds)
+uint16_t distance;		// Unit: decametres (km/100 )
 
 static void lcd_clear_row(uint8_t row)
 {
@@ -54,7 +42,7 @@ static void lcd_clear_row(uint8_t row)
 	}
 }
 
-// The real main()
+// Called once at startup
 void setup(void)
 {
 	int status;
@@ -67,30 +55,21 @@ void setup(void)
 	Serial.begin(9600);
 
 	lcd.begin(16, 2);
-
-#if USE_PCF2119R
-	lcd.command(0x35);				// Switch to extended command mode
-	lcd.command(0x80+31);			// Set Va = 4.3v
-	lcd.command(0xc0+31);			// Set Vb = 4.3v
-	lcd.command(0x34);				// Switch to normal command mode
-	lcd.display();					// Turn on display
-#else
-#endif
-	lcd_clear_row(0);				// Clear display. clear() doesn't work in this hardware
+	lcd_clear_row(0);
 	lcd_clear_row(1);
 
-	lcd.setCursor(0,0);				// Boring welcome message
+	lcd.setCursor(0, 0);			// Boring welcome message
 	lcd.print(F("Bike Computer!"));
 
 	delay(1000);
 
 	status = fm_init();				// Initialise SD card interface
-	FmStatus(status);
+	display_error(status);
 	if ( status == 0 )
 	{
 		delay(100);
 		status = fm_open();
-		FmStatus(status);
+		display_error(status);
 		if ( status == 0 )
 		{
 			modes |= MODE_LOGGING;
@@ -101,6 +80,7 @@ void setup(void)
 	btn_init();
 }
 
+// Called in an endless loop
 void loop()
 {
 	uint8_t elapsed = tm_elapsed();
@@ -139,11 +119,11 @@ void loop()
 						uint8_t q = fm_write(gpsbuf);
 						if ( q > 250 )
 						{
-							FmStatus(q);
+							display_error(q);
 						}
 						else
 						{
-							FmStatus(0);
+							display_error(0);
 						}
 					}
 				}
@@ -198,6 +178,12 @@ void mode_control(uint8_t btn)
 			update_delay = 1;
 			break;
 
+		case MODE_TRIP:
+			//			 0123456789012345
+			lcd.print(F("Trip time/dist"));
+			update_delay = 1;
+			break;
+
 		case MODE_LOGGING_CTRL:
 			display_logging();
 			break;
@@ -224,7 +210,7 @@ void mode_control(uint8_t btn)
 			if ( modes & MODE_LOGGING )
 			{	// Logging turned on
 				int status = fm_open();
-				FmStatus(status);
+				display_error(status);
 				if ( status != 0 )
 					modes &= ~MODE_LOGGING;
 			}
@@ -256,7 +242,7 @@ void mode_control(uint8_t btn)
 			}
 
 			lcd_clear_row(1);
-			lcd.setCursor(0,1);
+			lcd.setCursor(0, 1);
 			switch ( modes & MODE_DISPLAY_1 )
 			{
 			case MODE_TIME_WHEELSPEED:
@@ -311,7 +297,7 @@ void display_time(const char *b)
 		}
 	}
 
-	lcd.setCursor(0,1);
+	lcd.setCursor(0, 1);
 	if ( err )
 	{
 		lcd.print(F("--:--:-- "));
@@ -375,10 +361,6 @@ void display_degrees(const char *b)
 		return;							// Unrecognised direction; bad data
 	
 	lcd.setCursor(col,0);				// Cursor to start of output field
-	for ( uint8_t j = 0; j < 8; j++ )	// Clear output field (half of top line)
-		lcd.write(' ');
-
-	lcd.setCursor(col,0);				// Cursor to start of output field
 	lcd.write(b[i]);					// Direction
 	for ( i = 0; i < (dp - 2); i++ )	// Degrees
 		lcd.write(b[i]);
@@ -413,20 +395,32 @@ void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
 	uint16_t f_kn = 0;	// Fractional part
 	uint16_t div = 1;
 	uint8_t i;
+	uint8_t fw;			// Field width
 
 	if ( update_delay > 0 )
 	{
 		return;
 	}
 
-	lcd.setCursor(col,row);				// Cursor to start of output field
+	fw = 16 - col;
+	if ( fw > 10 )
+	{
+		fw = 10;
+	}
+
+	lcd.setCursor(col, row);			// Cursor to start of output field
 
 	// Work in integers for the whole number and fractional parts
 	for ( i = 0; b[i] != '.'; i++ )		// Whole number part
 	{
 		if ( !isdigit(b[i]) )
 		{								// Not-a-digit found; bad data
-			lcd.print(F(" -.-- km/h"));
+			i = lcd.print(F("-.--"));
+			while ( i < fw )
+			{
+				lcd.write(' ');
+				i++;
+			}
 			return;
 		}
 		kn = kn * 10 + d2n(b[i]);
@@ -436,7 +430,12 @@ void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
 	{
 		if ( !isdigit(b[i]) )
 		{								// Not-a-digit found; bad data
-			lcd.print(F(" -.-- km/h"));
+			i = lcd.print(F("-.--"));
+			while ( i < fw )
+			{
+				lcd.write(' ');
+				i++;
+			}
 			return;
 		}
 		f_kn = f_kn * 10 + d2n(b[i]);
@@ -446,8 +445,12 @@ void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
 	double speed = (double)kn + (double)f_kn / (double)div;		// knots
 	speed = speed * 1.852001;									// km/h
 
-	lcd.print(speed, 2);
-	lcd.print(F(" km/h "));
+	i = lcd.print(speed, 2);
+	while ( i < fw )
+	{
+		lcd.write(' ');
+		i++;
+	}
 }
 
 // Display wheel speed
@@ -459,8 +462,23 @@ void display_wheelspeed(void)
 		return;
 	}
 
-	lcd.setCursor(9,1);
-	lcd.print(F(" 0.00  "));
+	lcd.setCursor(9, 1);
+	//			"9012345
+	lcd.print(F("   0.00"));
+}
+
+// Display trip distance
+// Distance not implemented yet
+void display_distance(void)
+{
+	if ( update_delay > 0 )
+	{
+		return;
+	}
+
+	lcd.setCursor(9, 1);
+	//			"9012345
+	lcd.print(F("   0.00"));
 }
 
 // Display heading
@@ -474,13 +492,30 @@ void display_heading(const char *b)
 		return;
 	}
 
-	lcd.setCursor(11,0);				// Cursor to start of output field
+	lcd.setCursor(10, 0);				// Cursor to start of output field
 	for ( i = 0; i < 5; i++ )			// At most 5 characters
 	{
-		if ( b[i] == '.' || isdigit(b[i]) )
-			lcd.write(b[i]);
-		else
-			return;
+		if ( !(b[i] == '.' || isdigit(b[i])) )
+			break;
+	}
+
+	if ( i == 0 )
+	{
+		//			"012345
+		lcd.print(F("  -.-\xdf"));		// \xdf is a degree sign
+	}
+	else
+	{
+		uint8_t k;
+		for ( k = 0; k < (5-i); k++ )
+		{
+			lcd.write(' ');
+		}
+		for ( k = 0; k < i; k++ )
+		{
+			lcd.write(b[k]);
+		}
+		lcd.write('\0xdf');				//	degree sign
 	}
 }
 
@@ -505,7 +540,7 @@ void display_date_time(const char *d, const char *t)
 			break;
 		}
 	}
-	lcd.setCursor(0,0);					// Cursor to start of output field
+	lcd.setCursor(0, 0);					// Cursor to start of output field
 	if ( err )
 	{
 		//			 0123456789
@@ -582,7 +617,7 @@ uint16_t time_to_t16(const char *t)
 }
 
 // Calculate and display the elapsed time
-void display_elapsed_time(const char *t)
+void display_elapsed_time(const char *t, uint8_t row)
 {
 	if ( update_delay > 0 )
 	{
@@ -612,10 +647,10 @@ void display_elapsed_time(const char *t)
 		t16 = t16 - start_time;
 	}
 
-	display_t16(t16);
+	display_t16(t16, row, (t[5] & 0x01));
 }
 
-void display_t16(uint16_t t)
+void display_t16(uint16_t t, uint8_t row, uint8_t odd)
 {
 	uint8_t s, m, h;
 
@@ -629,7 +664,7 @@ void display_t16(uint16_t t)
 	m = t%60;
 	h = t/60;
 
-	lcd.setCursor(0,1);
+	lcd.setCursor(0, row);
 	lcd.write((char)(h/10) + '0');
 	lcd.write((char)(h%10) + '0');
 	lcd.write(':');
@@ -637,41 +672,54 @@ void display_t16(uint16_t t)
 	lcd.write((char)(m%10) + '0');
 	lcd.write(':');
 	lcd.write((char)(s/10) + '0');
-	lcd.write((char)(s%10) + '0');
+	lcd.write((char)(s%10) + '0' + odd);
 	lcd.write(' ');
 }
 
 // Display logging status
 void display_logging(void)
 {
-	lcd.setCursor(0,0);
+	lcd.setCursor(0, 0);
 	lcd.print(F("Logging: "));
 
 	if ( (modes & MODE_LOGGING) == 0 )
 		lcd.print(F("off"));
 	else
-		lcd.print(F("on"));
+		lcd.print(F("on "));
 }
 
 // Display trip clear
 void display_trip(void)
 {
-	lcd.setCursor(0,0);
+	lcd.setCursor(0, 0);
 	lcd.print(F("Trip: "));
 }
 
 // Display trip cleared
 void display_cleared(void)
 {
-	lcd.setCursor(6,0);
+	lcd.setCursor(6, 0);
 	lcd.print(F("cleared"));
 }
 
 // Display menu entry
 void display_menu(void)
 {
-	lcd.setCursor(0,0);
+	lcd.setCursor(0, 0);
 	lcd.print(F("Settings"));
+}
+
+// Display error message
+void display_error(uint8_t err)
+{
+	if ( err != 0 )
+	{
+		modes = modes | MODE_ERROR;		// All bits set.
+		lcd_clear_row(0);
+		lcd.setCursor(0, 0);
+		lcd.print(F("Error "));
+		lcd.print(err);
+	}
 }
 
 #if DBG

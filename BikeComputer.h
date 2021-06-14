@@ -48,11 +48,12 @@ extern uint8_t modes;
 #define MODE_POSITION			0x00	// Display lat/long coordinates
 #define MODE_GPSSPEED_HEADING	0x01	// Display GPS speed and heading
 #define MODE_DATE_TIME			0x02	// Display date and time
-#define MODE_LOGGING_CTRL		0x03	// Display "Logging on/off"
-#define MODE_TRIP_CTRL			0x04	// Display "Trip" ... (cleared)
-#define MODE_ENTER_MENU			0x05	// Menu
+#define MODE_TRIP				0x03	// Display elapsed time and distance
+#define MODE_LOGGING_CTRL		0x04	// Display "Logging on/off"
+#define MODE_TRIP_CTRL			0x05	// Display "Trip" ... (cleared)
+#define MODE_ENTER_MENU			0x06	// Menu
 #define MODE_ERROR				0x07	// Error code. Cannot step to this value
-#define MODE_MAX_0				0x05	// Max value of display mode 0
+#define MODE_MAX_0				0x06	// Max value of display mode 0
 #define MODE_INC_0				0x01	// Increment value for display mode 0
 
 #define MODE_DISPLAY_1			0x38	// What to display on bottom line?
@@ -96,10 +97,12 @@ void display_logging(void);
 void display_trip(void);
 void display_cleared(void);
 void display_menu(void);
-void display_elapsed_time(const char *t);
-void display_t16(uint16_t t);
+void display_elapsed_time(const char *t, uint8_t row);
+void display_t16(uint16_t t, uint8_t row, uint8_t odd);
 uint16_t time_to_t16(const char *t);
 void display_wheelspeed(void);
+void display_distance(void);
+void display_error(uint8_t err);
 
 static inline void display_gpsspeed_l0(const char *b)
 {

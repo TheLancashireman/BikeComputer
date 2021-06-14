@@ -114,6 +114,12 @@ static uint8_t decode_gprmc(const char *s)
 	if ( start_time == 0xffff )
 		start_time = time_to_t16(&s[7]);
 
+	if ( (modes & MODE_DISPLAY_0) == MODE_TRIP )
+	{
+		display_elapsed_time(&s[7], 0);
+		display_distance();
+	}
+
 	if ( (modes & MODE_DISPLAY_1) == MODE_TIME_WHEELSPEED )
 	{
 		display_time(&s[7]);
@@ -128,13 +134,13 @@ static uint8_t decode_gprmc(const char *s)
 	else
 	if ( (modes & MODE_DISPLAY_1) == MODE_ELAPSED_WHEELSPEED )
 	{
-		display_elapsed_time(&s[7]);
+		display_elapsed_time(&s[7], 1);
 		display_wheelspeed();
 	}
 	else
 	if ( (modes & MODE_DISPLAY_1) == MODE_ELAPSED_GPSSPEED )
 	{
-		display_elapsed_time(&s[7]);
+		display_elapsed_time(&s[7], 1);
 		gpsspeed_line1 = 1;
 	}
 	
