@@ -166,9 +166,9 @@ void mode_control(uint8_t btn)
 			update_delay = 1;
 			break;
 
-		case MODE_GPSSPEED_HEADING:
+		case MODE_HEADING_GPSSPEED:
 			//			 0123456789012345
-			lcd.print(F("Speed & heading"));
+			lcd.print(F("Heading & speed"));
 			update_delay = 1;
 			break;
 
@@ -384,43 +384,36 @@ void display_degrees(const char *b)
 	x = (f/10) - 10*x;
 	lcd.write(x + '0');
 	lcd.write(f % 10 + '0');
+
+	if ( col == 0 )						// Clear the gap between the two fields when displaying latitude.
+		lcd.write(' ');
 }
 
 // Display GPS speed
 // Speed is given in knots (dd.ff)
 // Have to convert to km/h
-void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
+// Display in 6 characters, right justified.
+void display_gpsspeed(const char *b, uint8_t row)
 {
 	uint8_t kn = 0;		// Whole number
 	uint16_t f_kn = 0;	// Fractional part
 	uint16_t div = 1;
 	uint8_t i;
-	uint8_t fw;			// Field width
 
 	if ( update_delay > 0 )
 	{
 		return;
 	}
 
-	fw = 16 - col;
-	if ( fw > 10 )
-	{
-		fw = 10;
-	}
-
-	lcd.setCursor(col, row);			// Cursor to start of output field
+	lcd.setCursor(9, row);				// Cursor to start of output field
+	lcd.write(' ');						// Clear a character
 
 	// Work in integers for the whole number and fractional parts
 	for ( i = 0; b[i] != '.'; i++ )		// Whole number part
 	{
 		if ( !isdigit(b[i]) )
 		{								// Not-a-digit found; bad data
-			i = lcd.print(F("-.--"));
-			while ( i < fw )
-			{
-				lcd.write(' ');
-				i++;
-			}
+			lcd.print(F("  -.--"));
 			return;
 		}
 		kn = kn * 10 + d2n(b[i]);
@@ -430,12 +423,7 @@ void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
 	{
 		if ( !isdigit(b[i]) )
 		{								// Not-a-digit found; bad data
-			i = lcd.print(F("-.--"));
-			while ( i < fw )
-			{
-				lcd.write(' ');
-				i++;
-			}
+			lcd.print(F("  -.--"));
 			return;
 		}
 		f_kn = f_kn * 10 + d2n(b[i]);
@@ -445,12 +433,11 @@ void display_gpsspeed(const char *b, uint8_t col, uint8_t row)
 	double speed = (double)kn + (double)f_kn / (double)div;		// knots
 	speed = speed * 1.852001;									// km/h
 
-	i = lcd.print(speed, 2);
-	while ( i < fw )
-	{
+	if ( speed < 100.0 )
 		lcd.write(' ');
-		i++;
-	}
+	if ( speed < 10.0 )
+		lcd.write(' ');
+	lcd.print(speed, 2);
 }
 
 // Display wheel speed
@@ -482,7 +469,9 @@ void display_distance(void)
 }
 
 // Display heading
-// Copy field to display. At most 5 characters, stop when not a digit or dp.
+// Copy field to display. At most 6 characters, stop when not a digit or dp.
+//ÂIf first character is not numeric, display -.-
+// Field width 10 characters - clear unused columns
 void display_heading(const char *b)
 {
 	uint8_t i;
@@ -492,30 +481,27 @@ void display_heading(const char *b)
 		return;
 	}
 
-	lcd.setCursor(10, 0);				// Cursor to start of output field
-	for ( i = 0; i < 5; i++ )			// At most 5 characters
+	lcd.setCursor(0, 0);				// Cursor to start of output field
+	if ( !isdigit(b[0]) )
 	{
-		if ( !(b[i] == '.' || isdigit(b[i])) )
+		//			"0123...456789
+		lcd.print(F("-.-\xdf      "));	// \xdf is a degree sign
+		return;
+	}
+
+	for ( i = 0; i < 6; i++ )			// At most 6 characters
+	{
+		if ( b[i] == '.' || isdigit(b[i]) )
+			lcd.write(b[i]);
+		else
 			break;
 	}
 
-	if ( i == 0 )
+	lcd.write('\0xdf');					//	degree sign
+
+	for ( ; i < 9; i++ )
 	{
-		//			"012345
-		lcd.print(F("  -.-\xdf"));		// \xdf is a degree sign
-	}
-	else
-	{
-		uint8_t k;
-		for ( k = 0; k < (5-i); k++ )
-		{
-			lcd.write(' ');
-		}
-		for ( k = 0; k < i; k++ )
-		{
-			lcd.write(b[k]);
-		}
-		lcd.write('\0xdf');				//	degree sign
+		lcd.write(' ');
 	}
 }
 

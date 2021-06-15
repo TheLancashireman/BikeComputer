@@ -78,7 +78,7 @@ The information presented on the top line is controlled by the MODE_DISPLAY_0 fi
 | Mode                    |0|1|2|3|4|5|6|7|8|9|0|1|2|3|4|5| Function                                  |
 | ------------------------|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-------------------------------------------|
 | MODE_POSITION           |N|1|2|.|3|4|5| |E|0|1|2|.|3|4|5| display_degrees()/display_degrees()       |
-| MODE_GPSSPEED_HEADING   |1|2|3|.|4|5| | | | |1|2|3|.|4|`| display_gpsspeed()/display_heading()      |
+| MODE_HEADING_GPSSPEED   |1|2|3|.|4|5|`| | | |1|2|3|.|4|5| display_heading()/display_gpsspeed()      |
 | MODE_DATE_TIME          |Y|Y|Y|Y|-|M|M|-|D|D| |h|h|:|m|m| display_date_time()                       |
 | MODE_TRIP               |h|h|:|m|m|:|s|s| |1|2|3|4|.|5|6| display_elapsed_time()/display_distance() |
 | MODE_LOGGING_CTRL       |L|o|g|g|i|n|g|:| |o|f|f| | | | | display_logging()                         |

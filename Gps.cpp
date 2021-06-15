@@ -179,7 +179,7 @@ static uint8_t decode_gprmc(const char *s)
 		display_gpsspeed_l1(&s[i]);
 	}
 
-	if ( (modes & MODE_DISPLAY_0) == MODE_GPSSPEED_HEADING )
+	if ( (modes & MODE_DISPLAY_0) == MODE_HEADING_GPSSPEED )
 	{
 		display_gpsspeed_l0(&s[i]);
 		i = find_next(s, i, 1, ',');

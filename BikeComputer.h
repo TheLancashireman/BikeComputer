@@ -46,7 +46,7 @@ extern uint8_t modes;
 
 #define MODE_DISPLAY_0			0x07	// What to display on top line?
 #define MODE_POSITION			0x00	// Display lat/long coordinates
-#define MODE_GPSSPEED_HEADING	0x01	// Display GPS speed and heading
+#define MODE_HEADING_GPSSPEED	0x01	// Display GPS speed and heading
 #define MODE_DATE_TIME			0x02	// Display date and time
 #define MODE_TRIP				0x03	// Display elapsed time and distance
 #define MODE_LOGGING_CTRL		0x04	// Display "Logging on/off"
@@ -90,7 +90,7 @@ extern void mode_control(uint8_t btn);
 void display_time(const char *b);
 void display_date_time(const char *d, const char *t);
 void display_degrees(const char *b);
-void display_gpsspeed(const char *b, uint8_t col, uint8_t row);
+void display_gpsspeed(const char *b, uint8_t row);
 void display_heading(const char *b);
 void display_date(const char *b);
 void display_logging(void);
@@ -106,12 +106,12 @@ void display_error(uint8_t err);
 
 static inline void display_gpsspeed_l0(const char *b)
 {
-	display_gpsspeed(b, 0, 0);
+	display_gpsspeed(b, 0);
 }
 
 static inline void display_gpsspeed_l1(const char *b)
 {
-	display_gpsspeed(b, 9, 1);
+	display_gpsspeed(b, 1);
 }
 
 
