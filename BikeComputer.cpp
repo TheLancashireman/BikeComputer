@@ -476,7 +476,7 @@ void display_distance(void)
 		return;
 	}
 
-	lcd.setCursor(9, 1);
+	lcd.setCursor(9, 0);
 	//			"9012345
 	lcd.print(F("   0.00"));
 }
